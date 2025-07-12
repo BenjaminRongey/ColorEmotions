@@ -11,7 +11,7 @@ load_dotenv()
 # --- Configuration ---
 # Replace with the actual URL of your hosted Hugging Face model
 # You can find this on your model's page on the Hugging Face Hub.
-HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/YOUR_MODEL_NAME"
+HUGGING_FACE_API_URL = "https://nobv4nvnk5nb9v9x.us-east-1.aws.endpoints.huggingface.cloud"
 # It's best practice to store your API key as an environment variable
 HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
 
@@ -37,7 +37,7 @@ origins = [
     "http://localhost",
     "http://localhost:8080",
     # Add the URL of your GitHub Pages site here
-    "https://your-github-username.github.io",
+    "https://benjaminrongey.github.io/",
 ]
 
 app.add_middleware(
