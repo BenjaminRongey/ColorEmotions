@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebApp Landing Page</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <main class="content-container">
+        <label for="userInput" class="sr-only">User Input</label>
+
+        <!-- 
+        UPDATED: Switched back to a textarea with special attributes for auto-sizing.
+        - rows="1" starts it at a single line height.
+        - oninput="..." is a small piece of JS that resizes the box on every keystroke.
+        -->
+        <textarea 
+            id="userInput" 
+            name="userInput" 
+            rows="1" 
+            placeholder="Enter text here"
+            oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px';"
+        ></textarea>
+
+        <button type="submit">Submit</button>
+    </main>
+
+</body>
+</html>
