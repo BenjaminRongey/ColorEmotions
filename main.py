@@ -66,6 +66,10 @@ async def analyze_text_and_get_color(input_data: TextInput):
         response = requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload)
         response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
         model_output = response.json()
+        
+        # --- ADD THIS LINE ---
+        print(f"HUGGING FACE RESPONSE: {model_output}") 
+        # --- END OF ADDED LINE --
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=503, detail=f"Error communicating with Hugging Face API: {e}")
 
