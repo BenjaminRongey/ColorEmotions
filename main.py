@@ -37,7 +37,7 @@ origins = [
     "http://localhost",
     "http://localhost:8080",
     # Add the URL of your GitHub Pages site here
-    "https://benjaminrongey.github.io/",
+    "https://benjaminrongey.github.io",
 ]
 
 app.add_middleware(
