@@ -63,11 +63,23 @@ async def analyze_text_and_get_color(input_data: TextInput):
 
     # --- START OF FINAL PARSING LOGIC ---
     try:
-        # The corrected model output is a list of three dictionaries:
-        # e.g., [{'label': 'V', 'score': 3.49}, {'label': 'A', 'score': 3.62}, {'label': 'D', 'score': 3.02}]
-        
-        # Create a dictionary for easy lookup: {'V': 3.49, 'A': 3.62, 'D': 3.02}
-        scores = {item['label']: item['score'] for item in model_output}
+        # The model returns generic labels. We must map them to V, A, and D.
+        # IMPORTANT: This mapping assumes the order V, A, D corresponds to LABEL_0, 1, 2.
+        # Verify this if your results seem counter-intuitive.
+        label_to_vad_map = {
+            "LABEL_0": "V", # Assuming LABEL_0 is Valence
+            "LABEL_1": "A", # Assuming LABEL_1 is Arousal
+            "LABEL_2": "D"  # Assuming LABEL_2 is Dominance
+        }
+
+        # Create a dictionary with the correct 'V', 'A', 'D' keys
+        scores = {}
+        for item in model_output:
+            generic_label = item.get("label")
+            score_value = item.get("score")
+            if generic_label in label_to_vad_map:
+                vad_dimension = label_to_vad_map[generic_label]
+                scores[vad_dimension] = score_value
 
         # Get the VAD scores from the new dictionary
         # The model was trained on scores from 1 to 5.
