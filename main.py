@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import time # Import the time module for delays
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -49,71 +50,78 @@ async def analyze_text_and_get_color(input_data: TextInput):
     if not HUGGING_FACE_API_KEY:
         raise HTTPException(status_code=500, detail="Hugging Face API key not configured on the server.")
 
-    # 1. Send Text to Hugging Face Model
     headers = {"Authorization": f"Bearer {HUGGING_FACE_API_KEY}"}
-    payload = {"inputs": input_data.text, "parameters": {"top_k": 3}} # Request all 3 scores
+    payload = {"inputs": input_data.text, "parameters": {"top_k": 3}}
 
-    try:
-        response = requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        model_output = response.json()
-        print(f"Hugging Face API Response: {model_output}")
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=503, detail=f"Error communicating with Hugging Face API: {e}")
+    # === START OF NEW RETRY LOGIC ===
+    max_retries = 5
+    base_delay = 5  # seconds
 
-    # --- START OF FINAL PARSING LOGIC ---
+    for attempt in range(max_retries):
+        try:
+            # Make the request to the Hugging Face API
+            response = requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload, timeout=20) # 20-second timeout
+
+            # If the server is still starting up, it might return a 503
+            if response.status_code == 503:
+                # Raise an exception to trigger the retry logic
+                raise requests.exceptions.RequestException(f"Service Unavailable (503), attempt {attempt + 1}")
+
+            # If the request was successful (e.g., status 200), break the loop
+            response.raise_for_status()
+            model_output = response.json()
+            break # Exit the loop on success
+
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                # Wait before the next attempt
+                print(f"Error connecting to Hugging Face: {e}. Retrying in {base_delay} seconds...")
+                time.sleep(base_delay)
+            else:
+                # If all retries fail, raise the final error
+                print(f"All {max_retries} attempts failed. Error: {e}")
+                raise HTTPException(status_code=503, detail=f"Error communicating with Hugging Face API after multiple attempts: {e}")
+    # === END OF NEW RETRY LOGIC ===
+
+
+    # --- Parsing Logic (No changes needed here) ---
     try:
-        # The model returns generic labels. We must map them to V, A, and D.
-        # IMPORTANT: This mapping assumes the order V, A, D corresponds to LABEL_0, 1, 2.
-        # Verify this if your results seem counter-intuitive.
         label_to_vad_map = {
-            "LABEL_0": "V", # Assuming LABEL_0 is Valence
-            "LABEL_1": "A", # Assuming LABEL_1 is Arousal
-            "LABEL_2": "D"  # Assuming LABEL_2 is Dominance
+            "LABEL_0": "V",
+            "LABEL_1": "A",
+            "LABEL_2": "D"
         }
-
-        # Create a dictionary with the correct 'V', 'A', 'D' keys
         scores = {}
-        for item in model_output:
+        # The model output is sometimes nested, so we check for that
+        output_list = model_output[0] if isinstance(model_output[0], list) else model_output
+
+        for item in output_list:
             generic_label = item.get("label")
             score_value = item.get("score")
             if generic_label in label_to_vad_map:
                 vad_dimension = label_to_vad_map[generic_label]
                 scores[vad_dimension] = score_value
 
-        # Get the VAD scores from the new dictionary
-        # The model was trained on scores from 1 to 5.
-        valence_score = scores.get('V', 3.0) # Default to neutral 3.0
+        valence_score = scores.get('V', 3.0)
         arousal_score = scores.get('A', 3.0)
         dominance_score = scores.get('D', 3.0)
 
-        # Normalize scores from the model's [1, 5] range to a [0.0, 1.0] range
-        # that our HSL conversion logic can use.
         MAX_SCORE = 5.0
         MIN_SCORE = 1.0
         valence = (valence_score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)
         arousal = (arousal_score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)
         dominance = (dominance_score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)
         
-        # Clamp values to ensure they are safely within the 0.0-1.0 range
         valence = min(max(valence, 0.0), 1.0)
         arousal = min(max(arousal, 0.0), 1.0)
         dominance = min(max(dominance, 0.0), 1.0)
 
     except (IndexError, TypeError, KeyError) as e:
-        # This error will trigger if the model output is not the expected list of dicts.
-        raise HTTPException(status_code=500, detail=f"Could not parse VAD scores from model response. Error: {e}, Response: {model_output}")
-    # --- END OF FINAL PARSING LOGIC ---
-
-
-    # 2. Convert VAD Floats (0.0-1.0) to HSL Integers
-    # Valence (Pleasure) -> Hue (Color)
+        raise HTTPException(status_code=500, detail=f"Could not parse VAD scores. Error: {e}, Response: {model_output}")
+    
+    # --- HSL Conversion (No changes needed here) ---
     hue = int(valence * 240)
-
-    # Arousal (Excitement) -> Saturation (Intensity)
     saturation = int(40 + (arousal * 60))
-
-    # Dominance (Control) -> Lightness (Brightness)
     lightness = int(30 + (dominance * 40))
 
     return HSLResponse(h=hue, s=saturation, l=lightness)
