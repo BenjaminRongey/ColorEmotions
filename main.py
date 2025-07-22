@@ -115,11 +115,10 @@ async def analyze_text_and_get_color(input_data: TextInput):
     if cdfs is None:
         raise HTTPException(status_code=500, detail="CDF data not loaded on the server.")
 
-    # Use numpy.interp to find the percentile for each score from the CDF
-    # np.interp(x, xp, fp) where xp=CDF x-values, fp=CDF y-values
-    valence = np.interp(valence_score, cdf_v[0], cdf_v[1])
-    arousal = np.interp(arousal_score, cdf_a[0], cdf_a[1])
-    dominance = np.interp(dominance_score, cdf_d[0], cdf_d[1])
+    # The cdf_v/a/d objects are interp1d functions, so we can call them directly.
+    valence = cdf_v(valence_score)
+    arousal = cdf_a(arousal_score)
+    dominance = cdf_d(dominance_score)
     
     # Ensure the final values are clipped between 0.0 and 1.0
     valence = min(max(valence, 0.0), 1.0)
