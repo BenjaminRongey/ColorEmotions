@@ -5,3 +5,4 @@ requests
 pydantic
 python-dotenv
 numpy
+scipy
