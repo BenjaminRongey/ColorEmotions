@@ -42,6 +42,10 @@ class HSLResponse(BaseModel):
     s: int
     l: int
 
+class WarmupResponse(BaseModel):
+    message: str
+
+
 # --- CORS Middleware ---
 origins = [
     "http://localhost",
@@ -57,7 +61,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- API Endpoint ---
+# --- API Endpoints ---
+@app.post("/warmup", response_model=WarmupResponse)
+async def warmup_model():
+    """
+    Receives a request to warm up the Hugging Face model.
+    """
+    if not HUGGING_FACE_API_KEY:
+        raise HTTPException(status_code=500, detail="Hugging Face API key not configured on the server.")
+
+    headers = {"Authorization": f"Bearer {HUGGING_FACE_API_KEY}"}
+    payload = {"inputs": "health check"}
+
+    try:
+        requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload, timeout=20)
+    except requests.exceptions.RequestException as e:
+        # Log the error but don't block. The main endpoint has retry logic.
+        print(f"Warmup request failed: {e}")
+
+    return WarmupResponse(message="Warmup signal sent")
+
 @app.post("/analyze", response_model=HSLResponse)
 async def analyze_text_and_get_color(input_data: TextInput):
     """
